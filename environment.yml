@@ -1,0 +1,6 @@
+name: ReportingWithAIAgent_env
+channels:
+  - defaults
+dependencies:
+  - pip=25.1
+  - python=3.13
