@@ -30,12 +30,15 @@ ENV/
 # IDE
 .idea/
 .vscode/
+.claude/
 *.swp
 *.swo
 
 # AWS
 .aws-sam/
 samconfig.toml
+
+deployment/artifacts/
 
 # Misc
 .DS_Store

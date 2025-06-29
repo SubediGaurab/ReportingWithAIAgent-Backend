@@ -2,60 +2,83 @@ import os
 import logging
 import jsonpickle
 import boto3
-import json  
+import json
 import uuid
 import asyncio
-from function.agent import inline_agent
+from agent import inline_agent
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-client = boto3.client('lambda')
-client.get_account_settings()
 
-def lambda_handler(event, context):  
-    """
-    Main Lambda handler function.  
-    """
-    logger.info('## ENVIRONMENT VARIABLES\r' + jsonpickle.encode(dict(**os.environ)))
-    logger.info('## EVENT\r' + jsonpickle.encode(event))
-    logger.info('## CONTEXT\r' + jsonpickle.encode(context))
+def lambda_handler(event, context):
+    route_key = event.get('requestContext', {}).get('routeKey')
+    connection_id = event.get('requestContext', {}).get('connectionId')
 
-    try:  
-        body = json.loads(event.get("body", "{}"))  
+    if route_key == '$connect':
+        logger.info(f"New connection: {connection_id}")
+        return {'statusCode': 200, 'body': 'Connected.'}
+    elif route_key == '$disconnect':
+        logger.info(f"Connection closed: {connection_id}")
+        return {'statusCode': 200, 'body': 'Disconnected.'}
+
+    apigw_management_client = boto3.client(
+        'apigatewaymanagementapi',
+        endpoint_url=f"https://{event['requestContext']['domainName']}/{event['requestContext']['stage']}"
+    )
+
+    def post_to_connection(connection_id, data):
+        try:
+            apigw_management_client.post_to_connection(
+                ConnectionId=connection_id,
+                Data=json.dumps(data).encode('utf-8')
+            )
+        except apigw_management_client.exceptions.GoneException:
+            logger.warning(f"Connection {connection_id} is gone.")
+        except Exception as e:
+            logger.error(f"Error sending message to {connection_id}: {e}")
+
+    def thought_callback(thought):
+        post_to_connection(connection_id, {'type': 'thought', 'content': thought})
+
+    try:
+        body = json.loads(event.get("body", "{}"))
         prompt = body.get("prompt")
 
-        if not prompt:  
-            return {  
-                "statusCode": 400,  
-                "body": json.dumps({"error": "Request body must be JSON and contain a 'prompt' key."}),  
-            }
+        if not prompt:
+            post_to_connection(connection_id, {'error': 'Request body must be JSON and contain a "prompt" key.'})
+            return {'statusCode': 400}
 
-        # Generate a unique session ID for each invocation  
-        session_id = str(uuid.uuid4())  
-        
-        # Invoke the agent  
+        session_id = str(uuid.uuid4())
+
+        # Update the agent to accept the callback
+        inline_agent.agent.thought_callback = thought_callback
+
         agent_response = asyncio.run(inline_agent.invoke_agent(prompt, session_id))
 
-        # The agent is instructed to return either a valid JSON or a string message.  
-        # We try to parse it as JSON. If it fails, we treat it as a plain text message.  
-        try:  
-            chart_params = json.loads(agent_response)  
-            response_body = json.dumps(chart_params)  
-            content_type = "application/json"  
-        except json.JSONDecodeError:  
-            response_body = json.dumps({"message": agent_response})  
-            content_type = "application/json"
+        try:
+            # Trim JSON response to remove any extraneous content before parsing
+            # This handles cases where the model includes thinking or other text
+            # outside the JSON structure due to library or model processing bugs
+            first_brace = agent_response.find('{')
+            last_brace = agent_response.rfind('}')
+            
+            if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
+                trimmed_response = agent_response[first_brace:last_brace + 1]
+            else:
+                trimmed_response = agent_response
+            
+            chart_params = json.loads(trimmed_response)
+            response_data = {'type': 'result', 'data': chart_params}
+        except json.JSONDecodeError:
+            # If agent didn't return valid JSON, format as proper error response
+            response_data = {'type': 'result', 'data': {'error': agent_response}}
 
-        return {  
-            "statusCode": 200,  
-            "body": response_body,  
-            "headers": {"Content-Type": content_type},  
-        }
+        post_to_connection(connection_id, response_data)
 
-    except Exception as e:  
-        logger.error(f"An error occurred: {e}")  
-        return {  
-            "statusCode": 500,  
-            "body": json.dumps({"error": "An internal server error occurred."}),  
-        }
+        return {'statusCode': 200}
+
+    except Exception as e:
+        logger.error(f"An error occurred: {e}")
+        post_to_connection(connection_id, {'error': 'An internal server error occurred.'})
+        return {'statusCode': 500}

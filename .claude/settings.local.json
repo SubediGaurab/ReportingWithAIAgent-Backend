@@ -3,7 +3,18 @@
     "allow": [
       "WebFetch(domain:github.com)",
       "Bash(conda activate:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(grep:*)",
+      "Bash(source ~/.bashrc)",
+      "Bash(./deployment/1-create-bucket.sh:*)",
+      "Bash(ls:*)",
+      "Bash(bash:*)",
+      "Bash(echo:*)",
+      "Bash(mkdir:*)",
+      "Bash(aws apigateway:*)",
+      "Bash(aws cloudfront get-distribution:*)",
+      "Bash(dos2unix:*)",
+      "WebFetch(domain:docs.aws.amazon.com)"
     ],
     "deny": []
   }

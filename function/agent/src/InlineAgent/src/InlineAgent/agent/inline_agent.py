@@ -50,14 +50,20 @@ class InlineAgent:
     knowledge_bases: List[KnowledgeBasePlugin] = field(default_factory=list)
     prompt_override_configuration: Dict = field(default_factory=dict)
     api_call_delay: float = field(default=1.0)  # Delay in seconds between sequential API calls
+    thought_callback: Optional[Callable] = None
 
     profile: str = field(default="default")
     user_input: bool = False
     tool_map: Dict[str, Callable] = None
+    _override_region: Optional[str] = field(default=None)
 
     @property
     def session(self) -> boto3.Session:
         """Lazy loading of AWS session"""
+        # Use override region if specified
+        if self._override_region:
+            return boto3.Session(region_name=self._override_region)
+        
         try:
             return boto3.Session(profile_name=self.profile)
         except:
@@ -375,6 +381,7 @@ class InlineAgent:
                             trace=event["trace"]["trace"],
                             truncateResponse=truncate_response,
                             agentName=self.agent_name,
+                            thought_callback=self.thought_callback,
                         )
                         total_input_tokens += int(input_tokens)
                         total_output_tokens += int(output_tokens)

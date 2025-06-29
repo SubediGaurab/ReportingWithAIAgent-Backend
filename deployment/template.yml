@@ -1,0 +1,180 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: ReportingWithAIAgent Backend - Lambda function with Bedrock agent for chart generation
+
+Parameters:
+  DBUser:
+    Type: String
+    Description: Database username
+    Default: ''
+  DBPassword:
+    Type: String
+    Description: Database password
+    NoEcho: true
+    Default: ''
+  DBHost:
+    Type: String
+    Description: Database host
+    Default: ''
+  DBPort:
+    Type: String
+    Description: Database port
+    Default: '5432'
+  DBName:
+    Type: String
+    Description: Database name
+    Default: ''
+  BedrockRegion:
+    Type: String
+    Description: AWS Bedrock Region
+    Default: 'us-west-2'
+
+Resources:
+  ReportingAgentFunction:
+    Type: AWS::Serverless::Function
+    DeletionPolicy: Delete
+    Properties:
+      FunctionName: ReportingWithAIAgent-Backend
+      CodeUri: ../function/
+      Handler: lambda_function.lambda_handler
+      Runtime: python3.11
+      Architectures:
+        - x86_64
+      Timeout: 300
+      MemorySize: 512
+      Layers:
+        - !Ref DependenciesLayer
+      Environment:
+        Variables:
+          user: !Ref DBUser
+          password: !Ref DBPassword
+          host: !Ref DBHost
+          port: !Ref DBPort
+          dbname: !Ref DBName
+          BedrockRegion: !Ref BedrockRegion
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action:
+                - bedrock:InvokeInlineAgent
+                - bedrock:InvokeModel
+                - bedrock:InvokeModelWithResponseStream
+                - bedrock:GetFoundationModel
+                - bedrock:ListFoundationModels
+                - bedrock:GetModelInvocationLoggingConfiguration
+              Resource: '*'
+            - Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+              Resource: '*'
+            - Effect: Allow
+              Action:
+                - execute-api:ManageConnections
+              Resource: '*'
+
+  DependenciesLayer:
+    Type: AWS::Serverless::LayerVersion
+    DeletionPolicy: Delete
+    Properties:
+      LayerName: ReportingAgent-Dependencies
+      Description: Dependencies for ReportingWithAIAgent Backend
+      ContentUri: artifacts/layer.zip
+      CompatibleRuntimes:
+        - python3.11
+
+  ReportingAgentWebSocketApi:
+    Type: AWS::ApiGatewayV2::Api
+    DeletionPolicy: Delete
+    Properties:
+      Name: ReportingWithAIAgent-WebSocket-API
+      ProtocolType: WEBSOCKET
+      RouteSelectionExpression: $request.body.action
+
+  # WebSocket Routes
+  ConnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref ReportingAgentWebSocketApi
+      RouteKey: $connect
+      AuthorizationType: NONE
+      Target: !Sub 'integrations/${ConnectIntegration}'
+  
+  DisconnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref ReportingAgentWebSocketApi
+      RouteKey: $disconnect
+      AuthorizationType: NONE
+      Target: !Sub 'integrations/${DisconnectIntegration}'
+  
+  DefaultRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref ReportingAgentWebSocketApi
+      RouteKey: $default
+      AuthorizationType: NONE
+      Target: !Sub 'integrations/${DefaultIntegration}'
+
+  # WebSocket Integrations
+  ConnectIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref ReportingAgentWebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ReportingAgentFunction.Arn}/invocations'
+
+  DisconnectIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref ReportingAgentWebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ReportingAgentFunction.Arn}/invocations'
+
+  DefaultIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref ReportingAgentWebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ReportingAgentFunction.Arn}/invocations'
+
+  # Lambda Permissions for WebSocket API
+  ConnectPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref ReportingAgentFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ReportingAgentWebSocketApi}/*/*'
+
+  # WebSocket Deployment and Stage
+  ReportingAgentWebSocketDeployment:
+    Type: AWS::ApiGatewayV2::Deployment
+    DependsOn:
+      - ConnectRoute
+      - DisconnectRoute
+      - DefaultRoute
+    Properties:
+      ApiId: !Ref ReportingAgentWebSocketApi
+
+  ReportingAgentWebSocketStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref ReportingAgentWebSocketApi
+      StageName: prod
+      DeploymentId: !Ref ReportingAgentWebSocketDeployment
+
+Outputs:
+  FunctionName:
+    Description: Lambda Function Name
+    Value: !Ref ReportingAgentFunction
+    Export:
+      Name: !Sub "${AWS::StackName}-FunctionName"
+  
+  WebSocketEndpoint:
+    Description: WebSocket API Gateway endpoint URL
+    Value: !Sub "wss://${ReportingAgentWebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/prod"
+    Export:
+      Name: !Sub "${AWS::StackName}-WebSocketEndpoint"

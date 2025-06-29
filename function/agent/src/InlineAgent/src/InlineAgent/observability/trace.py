@@ -19,6 +19,7 @@ class Trace:
         trace: Dict,
         agentName: str,
         truncateResponse: int = None,
+        thought_callback: callable = None,
     ):
         input_tokens = 0
         output_tokens = 0
@@ -41,7 +42,7 @@ class Trace:
         HighLevelTrace.guardrail_trace(trace=trace)
 
         orch_input_tokens, orch_output_tokens, orch_llm_calls = (
-            HighLevelTrace.parse_orchestration_trace(trace=trace, agentName=agentName)
+            HighLevelTrace.parse_orchestration_trace(trace=trace, agentName=agentName, thought_callback=thought_callback)
         )
         input_tokens += orch_input_tokens
         output_tokens += orch_output_tokens
@@ -185,7 +186,7 @@ class HighLevelTrace:
                     )
 
     @staticmethod
-    def parse_orchestration_trace(trace: Dict, agentName: str):
+    def parse_orchestration_trace(trace: Dict, agentName: str, thought_callback: callable = None):
         # This is a Tagged Union structure. Only one of the following top level keys will be set: invocationInput, modelInvocationInput, modelInvocationOutput, observation, rationale. If a client receives an unknown member it will set SDK_UNKNOWN_MEMBER as the top level key, which maps to the name or tag of the unknown member. The structure of SDK_UNKNOWN_MEMBER is as follows:'SDK_UNKNOWN_MEMBER': {'name': 'UnknownMemberName'}
 
         if "orchestrationTrace" in trace:
@@ -215,6 +216,8 @@ class HighLevelTrace:
                 # else:
                 #     # Main agent
                 #     print(colored("Supervisor Agent Invoked", TraceColor.rationale))
+                if thought_callback:
+                    thought_callback(trace['orchestrationTrace']['rationale']['text'])
                 print(
                     colored(
                         f"Thought: {trace['orchestrationTrace']['rationale']['text']}",
