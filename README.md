@@ -1,10 +1,6 @@
-# CLAUDE.md
+# ReportingWithAIAgent Backend
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
-## Project Overview
-
-This is an AWS Lambda-based AI agent that generates Chart.js-compatible JSON from natural language prompts by querying a PostgreSQL database. The system uses Amazon Bedrock's inline agent functionality with real-time WebSocket streaming to interpret user requests and generate data visualizations.
+An AWS Lambda-based AI agent that generates Chart.js-compatible JSON from natural language prompts by querying a PostgreSQL database. The system uses Amazon Bedrock's inline agent functionality with real-time WebSocket streaming to interpret user requests and generate data visualizations.
 
 ## Architecture
 
@@ -32,24 +28,33 @@ The agent is configured to:
 4. Return Chart.js-compatible JSON or error messages
 5. Stream intermediate thoughts during processing via WebSocket
 
-## Development Commands
+## Prerequisites
 
-### Environment Setup
+- **System Dependencies**: 
+  - Ubuntu/Debian: `sudo apt install zip jq`
+  - RHEL/CentOS/Amazon Linux: `sudo yum install zip jq`
+  - macOS: `brew install zip jq`
+- **Docker Desktop** must be running (required for building Lambda layer)
+- **AWS CLI** configured with appropriate permissions
+- **Python 3.11** or compatible version
+
+## Environment Setup
+
+### Create Conda Environment
 ```bash
 # Create conda environment
 conda env create -f environment.yml
 
-# For Claude Code: Use conda shell hook to enable conda in bash session
-eval "$(/home/gaura/miniconda3/bin/conda shell.bash hook)" && conda activate ReportingWithAIAgent_env
+# Activate environment
+conda activate ReportingWithAIAgent_env
 
 # Install Python dependencies locally for development
 pip install -r function/requirements.txt python-dotenv
-
-# Create .env file with database credentials (REQUIRED)
-# Copy the template below and add your actual database values
 ```
 
-**Create `.env` file in project root with these keys:**
+### Database Configuration
+
+Create a `.env` file in the project root with these keys:
 ```bash
 user=your_db_username
 password=your_db_password
@@ -59,24 +64,20 @@ dbname=your_database_name
 BedrockRegion=us-west-2  # Optional: Override default Bedrock region
 ```
 
-### AWS Deployment
+The application connects to a PostgreSQL database using these environment variables. For local development, use the `.env` file. In AWS, these are configured as Lambda environment variables via CloudFormation template parameters.
 
-**Prerequisites:** 
-- Ensure `zip` and `jq` commands are installed on your system:
-  - Ubuntu/Debian: `sudo apt install zip jq`
-  - RHEL/CentOS/Amazon Linux: `sudo yum install zip jq`
-  - macOS: `brew install zip jq`
-- Docker Desktop must be running (required for building Lambda layer)
+## Deployment
 
+### Quick Deployment (Recommended)
 ```bash
 # Navigate to deployment directory
 cd deployment
 
-# Run complete deployment pipeline (recommended)
+# Run complete deployment pipeline
 ./deploy-all.sh
 ```
 
-**Alternative: Run individual scripts**
+### Manual Deployment Steps
 ```bash
 # Create S3 bucket for deployment artifacts
 ./1-create-bucket.sh
@@ -90,30 +91,66 @@ source ./3-export-env.sh
 # Deploy CloudFormation stack (MUST use source)
 source ./4-deploy.sh
 
-# Clean up resources (MANDATORY after testing)
-./6-cleanup.sh
-
 # Test deployed function
 ./5-invoke.sh
+
+# Clean up resources when done (MANDATORY after testing)
+./6-cleanup.sh
 ```
 
-### Local Development
+## Local Development
+
 ```bash
 # Test database connectivity locally
 python manual_run.py
 ```
 
-## Database Configuration
+## Testing
 
-The application connects to a PostgreSQL database using environment variables:
-- `user`: Database username
-- `password`: Database password  
-- `host`: Database host
-- `port`: Database port (default: 5432)
-- `dbname`: Database name
-- `BedrockRegion`: AWS Bedrock region (optional, defaults to us-west-2)
+### WebSocket Testing with Postman (Recommended)
+Postman provides the best testing experience for real-time streaming responses.
 
-For local development, create a `.env` file with these variables. In AWS, these are configured as Lambda environment variables via CloudFormation template parameters.
+1. Create a new WebSocket connection to your deployed endpoint:
+   ```
+   wss://your-api-id.execute-api.region.amazonaws.com/prod
+   ```
+
+2. After the WebSocket connects, send this message:
+   ```json
+   {
+       "prompt": "Show me sales data as bar chart"
+   }
+   ```
+
+3. Watch for real-time streaming responses:
+   - `{'type': 'thought', 'content': 'Agent thinking...'}` - Intermediate thoughts
+   - `{'type': 'result', 'data': {...}}` - Final Chart.js JSON
+
+### AWS Lambda Console Testing
+
+Use this event JSON in AWS Lambda console:
+```json
+{
+  "requestContext": {
+    "routeKey": "sendmessage",
+    "connectionId": "test-connection-123",
+    "domainName": "your-api-id.execute-api.region.amazonaws.com",
+    "stage": "prod"
+  },
+  "body": "{\"prompt\": \"Generate chart of sales by region.\"}"
+}
+```
+
+### API Testing Format
+
+The function expects requests with JSON body containing a 'prompt' field:
+```json
+{
+  "prompt": "Show me sales by region as a bar chart"
+}
+```
+
+Returns either Chart.js JSON or error messages in standardized format.
 
 ## Key Dependencies
 
@@ -125,7 +162,7 @@ For local development, create a `.env` file with these variables. In AWS, these 
 
 ## Agent Behavior
 
-The Bedrock agent is instructed to:
+The Bedrock agent is configured to:
 - Only process chart generation requests
 - Always query the 'ReportingWithAIAgent' schema
 - Enforce read-only database access (SELECT queries only)
@@ -167,53 +204,6 @@ manual_run.py            # Local testing utility
 environment.yml          # Conda environment specification
 ```
 
-## Testing
-
-### Local Testing
-```bash
-# Test database connectivity and Lambda function locally
-python manual_run.py
-```
-
-### AWS Lambda Console Testing
-Use this event JSON in AWS Lambda console to test the deployed function. Note that API Gateway errors will be raised since we're bypassing the gateway, but the Lambda function will continue to work:
-```json
-{
-  "requestContext": {
-    "routeKey": "sendmessage",
-    "connectionId": "test-connection-123",
-    "domainName": "15fdvwkqa7.execute-api.us-west-1.amazonaws.com",
-    "stage": "prod"
-  },
-  "body": "{\"prompt\": \"Generate chart of patient age and cancer risk.\"}"
-}
-```
-
-### WebSocket Testing with Postman (Recommended)
-Postman is the best way to test as it allows you to see all streamed responses in real-time.
-
-1. Create a new WebSocket connection to:
-   ```
-   wss://15fdvwkqa7.execute-api.us-west-1.amazonaws.com/prod
-   ```
-
-2. After the WebSocket is connected, send this message:
-   ```json
-   {
-       "prompt": "Show me sales data as bar chart"
-   }
-   ```
-
-### API Gateway Testing
-The function expects POST requests with JSON body containing a 'prompt' field:
-```json
-{
-  "prompt": "Show me sales by region as a bar chart"
-}
-```
-
-Returns either Chart.js JSON or error messages in standardized format.
-
 ## Advanced Features
 
 ### Real-time Streaming
@@ -241,3 +231,7 @@ Returns either Chart.js JSON or error messages in standardized format.
 - **Schema Isolation**: Restricted to 'ReportingWithAIAgent' schema
 - **Query Validation**: SQL injection protection through parameterized queries
 - **Connection Management**: Proper database connection lifecycle handling
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.

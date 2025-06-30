@@ -14,7 +14,9 @@
       "Bash(aws apigateway:*)",
       "Bash(aws cloudfront get-distribution:*)",
       "Bash(dos2unix:*)",
-      "WebFetch(domain:docs.aws.amazon.com)"
+      "WebFetch(domain:docs.aws.amazon.com)",
+      "Bash(warp-terminal:*)",
+      "Bash(dpkg:*)"
     ],
     "deny": []
   }
