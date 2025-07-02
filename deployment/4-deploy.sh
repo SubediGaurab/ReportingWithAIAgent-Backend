@@ -30,7 +30,8 @@ aws cloudformation deploy \
         DBHost="${host}" \
         DBPort="${port}" \
         DBName="${dbname}" \
-        BedrockRegion="${BedrockRegion}"
+        BedrockRegion="${BedrockRegion}" \
+        GeminiApiKey="${GeminiApiKey}"
 
 echo "Stack deployed successfully: $STACK_NAME"
 aws cloudformation describe-stacks --stack-name $STACK_NAME --query 'Stacks[0].Outputs'

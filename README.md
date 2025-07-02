@@ -1,6 +1,6 @@
 # ReportingWithAIAgent Backend
 
-An AWS Lambda-based AI agent that generates Chart.js-compatible JSON from natural language prompts by querying a PostgreSQL database. The system uses Amazon Bedrock's inline agent functionality with real-time WebSocket streaming to interpret user requests and generate data visualizations.
+An AWS Lambda-based AI agent that generates Chart.js-compatible JSON from natural language prompts by querying a PostgreSQL database. The system uses Amazon Bedrock's inline agent functionality with real-time WebSocket streaming to interpret user requests and generate data visualizations. Additionally, it includes a Gemini API proxy for chart insights and title suggestions with dynamic CORS support.
 
 ## Architecture
 
@@ -10,6 +10,7 @@ The application follows a serverless architecture with these key components:
 - **Inline Agent** (`function/agent/inline_agent.py`): Bedrock agent orchestration with tool specifications and streaming support
 - **SQL Tools** (`function/tools/sql_tools.py`): Database interaction layer with schema discovery and query execution
 - **Agent Instructions** (`function/agent/agent_instructions.md`): Detailed instructions for the AI agent behavior
+- **Gemini Proxy** (`function-gemini/index.js`): Node.js Lambda proxy for Gemini API with dynamic CORS handling
 - **Manual Runner** (`manual_run.py`): Local testing utility for database operations
 - **CloudFormation Template** (`deployment/template.yml`): Complete AWS infrastructure as code
 
@@ -62,9 +63,10 @@ host=your_db_host
 port=5432
 dbname=your_database_name
 BedrockRegion=us-west-2  # Optional: Override default Bedrock region
+GeminiApiKey=your_google_gemini_api_key  # Required for chart insights and title suggestions
 ```
 
-The application connects to a PostgreSQL database using these environment variables. For local development, use the `.env` file. In AWS, these are configured as Lambda environment variables via CloudFormation template parameters.
+The application connects to a PostgreSQL database and external APIs using these environment variables. For local development, use the `.env` file. In AWS, these are configured as Lambda environment variables via CloudFormation template parameters.
 
 ## Deployment
 
@@ -140,17 +142,43 @@ Use this event JSON in AWS Lambda console:
   "body": "{\"prompt\": \"Generate chart of sales by region.\"}"
 }
 ```
+Returns Chart.js JSON or error messages in standardized format.
 
-### API Testing Format
+### Gemini Proxy API Testing
 
-The function expects requests with JSON body containing a 'prompt' field:
+The Gemini API proxy is deployed as a separate Lambda function for chart insights and title suggestions.
+
+**Endpoint URL:**
+```
+https://6alcfdn1q1.execute-api.us-west-1.amazonaws.com/prod
+```
+
+**Request Format:**
 ```json
 {
-  "prompt": "Show me sales by region as a bar chart"
+  "contents": [{
+    "parts": [{
+      "text": "Explain how AI works in a few words"
+    }]
+  }]
 }
 ```
 
-Returns either Chart.js JSON or error messages in standardized format.
+**Response Format:**
+Returns Gemini API-compatible response with generated content and metadata.
+
+**Usage Example:**
+```bash
+curl -X POST https://6alcfdn1q1.execute-api.us-west-1.amazonaws.com/prod \
+  -H "Content-Type: application/json" \
+  -d '{
+    "contents": [{
+      "parts": [{
+        "text": "Suggest a catchy title for a sales performance chart"
+      }]
+    }]
+  }'
+```
 
 ## Key Dependencies
 
@@ -191,6 +219,9 @@ function/
 ├── tools/
 │   └── sql_tools.py      # Database interaction tools
 └── requirements.txt      # Python dependencies
+function-gemini/          # Gemini API proxy Lambda function
+├── index.js             # Node.js handler with dynamic CORS
+└── package.json         # Node.js dependencies
 deployment/               # AWS deployment scripts
 ├── deploy-all.sh         # Combined deployment pipeline
 ├── template.yml          # CloudFormation infrastructure template
@@ -222,7 +253,10 @@ environment.yml          # Conda environment specification
 ### Infrastructure as Code
 - **Complete AWS Stack**: CloudFormation template defines all resources
 - **WebSocket API**: API Gateway WebSocket API with proper routing
+- **REST API Proxy**: Gemini API proxy with dynamic CORS handling
+- **Rate Limiting**: Both APIs limited to 50 requests/second with 100 burst capacity
 - **Lambda Layer**: Optimized dependency packaging for faster cold starts
+- **Multi-Runtime Support**: Python 3.11 for main agent, Node.js 18 for Gemini proxy
 - **IAM Permissions**: Least-privilege security model
 - **Environment Variables**: Secure parameter passing via CloudFormation
 
@@ -231,6 +265,12 @@ environment.yml          # Conda environment specification
 - **Schema Isolation**: Restricted to 'ReportingWithAIAgent' schema
 - **Query Validation**: SQL injection protection through parameterized queries
 - **Connection Management**: Proper database connection lifecycle handling
+
+### Rate Limiting
+- **Chart Generation API**: 50 requests/second with 100 burst capacity
+- **Gemini Proxy API**: 50 requests/second with 100 burst capacity
+- **Throttling Response**: HTTP 429 (Too Many Requests) when limits exceeded
+- **Automatic Recovery**: Rate limits reset automatically after the time window
 
 ## License
 

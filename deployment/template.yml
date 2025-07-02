@@ -28,6 +28,10 @@ Parameters:
     Type: String
     Description: AWS Bedrock Region
     Default: 'us-west-2'
+  GeminiApiKey:
+    Type: String
+    Description: "Your Google Gemini API Key for title suggestions and insights"
+    NoEcho: true
 
 Resources:
   ReportingAgentFunction:
@@ -165,6 +169,52 @@ Resources:
       ApiId: !Ref ReportingAgentWebSocketApi
       StageName: prod
       DeploymentId: !Ref ReportingAgentWebSocketDeployment
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 100
+        ThrottlingRateLimit: 50
+
+  # Gemini API Proxy Resources
+  # Using Lambda proxy instead of HTTP integration due to CORS limitation:
+  # Access-Control-Allow-Origin header only accepts single origin, not comma-separated list
+  GeminiProxyFunction:
+    Type: AWS::Serverless::Function
+    DeletionPolicy: Delete
+    Properties:
+      FunctionName: ReportingAgent-Gemini-Proxy
+      CodeUri: ../function-gemini/
+      Handler: index.handler
+      Runtime: nodejs18.x
+      Architectures:
+        - x86_64
+      Timeout: 30
+      MemorySize: 128
+      Environment:
+        Variables:
+          GEMINI_API_KEY: !Ref GeminiApiKey
+      Events:
+        GeminiProxyApi:
+          Type: Api
+          Properties:
+            Path: /
+            Method: any
+            RestApiId: !Ref GeminiProxyApi
+
+  GeminiProxyApi:
+    Type: AWS::Serverless::Api
+    DeletionPolicy: Delete
+    Properties:
+      Name: ReportingAgent-Gemini-Proxy
+      StageName: prod
+      Cors:
+        AllowMethods: "'POST,OPTIONS'"
+        AllowHeaders: "'Content-Type'"
+        AllowOrigin: "'*'"  # Handled dynamically by Lambda function
+      MethodSettings:
+        - ResourcePath: "/*"
+          HttpMethod: "*"
+          ThrottlingRateLimit: 50
+          ThrottlingBurstLimit: 100
+
 
 Outputs:
   FunctionName:
@@ -178,3 +228,9 @@ Outputs:
     Value: !Sub "wss://${ReportingAgentWebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/prod"
     Export:
       Name: !Sub "${AWS::StackName}-WebSocketEndpoint"
+      
+  GeminiProxyEndpoint:
+    Description: "REST API Gateway endpoint URL for Gemini API proxy with dynamic CORS"
+    Value: !Sub "https://${GeminiProxyApi}.execute-api.${AWS::Region}.amazonaws.com/prod"
+    Export:
+      Name: !Sub "${AWS::StackName}-GeminiProxyEndpoint"

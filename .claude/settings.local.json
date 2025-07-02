@@ -16,7 +16,8 @@
       "Bash(dos2unix:*)",
       "WebFetch(domain:docs.aws.amazon.com)",
       "Bash(warp-terminal:*)",
-      "Bash(dpkg:*)"
+      "Bash(dpkg:*)",
+      "Bash(git add:*)"
     ],
     "deny": []
   }

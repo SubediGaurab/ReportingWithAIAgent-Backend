@@ -11,7 +11,7 @@ if [ ! -f artifacts/test-event.json ]; then
   "requestContext": {
     "routeKey": "sendmessage",
     "connectionId": "test-connection-123",
-    "domainName": "15fdvwkqa7.execute-api.us-west-1.amazonaws.com",
+    "domainName": "hqmrrdbtqd.execute-api.us-west-1.amazonaws.com",
     "stage": "prod"
   },
   "body": "{\"prompt\": \"Generate chart of patient age and cancer risk.\"}"

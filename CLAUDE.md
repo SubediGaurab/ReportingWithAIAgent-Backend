@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is an AWS Lambda-based AI agent that generates Chart.js-compatible JSON from natural language prompts by querying a PostgreSQL database. The system uses Amazon Bedrock's inline agent functionality with real-time WebSocket streaming to interpret user requests and generate data visualizations.
+This is an AWS Lambda-based AI agent that generates Chart.js-compatible JSON from natural language prompts by querying a PostgreSQL database. The system uses Amazon Bedrock's inline agent functionality with real-time WebSocket streaming to interpret user requests and generate data visualizations. Additionally, it includes a Gemini API proxy for chart insights and title suggestions with dynamic CORS support.
 
 ## Architecture
 
@@ -14,6 +14,7 @@ The application follows a serverless architecture with these key components:
 - **Inline Agent** (`function/agent/inline_agent.py`): Bedrock agent orchestration with tool specifications and streaming support
 - **SQL Tools** (`function/tools/sql_tools.py`): Database interaction layer with schema discovery and query execution
 - **Agent Instructions** (`function/agent/agent_instructions.md`): Detailed instructions for the AI agent behavior
+- **Gemini Proxy** (`function-gemini/index.js`): Node.js Lambda proxy for Gemini API with dynamic CORS handling
 - **Manual Runner** (`manual_run.py`): Local testing utility for database operations
 - **CloudFormation Template** (`deployment/template.yml`): Complete AWS infrastructure as code
 
@@ -57,6 +58,7 @@ host=your_db_host
 port=5432
 dbname=your_database_name
 BedrockRegion=us-west-2  # Optional: Override default Bedrock region
+GeminiApiKey=your_google_gemini_api_key  # Required for chart insights and title suggestions
 ```
 
 ### AWS Deployment
@@ -105,13 +107,14 @@ python manual_run.py
 
 ## Database Configuration
 
-The application connects to a PostgreSQL database using environment variables:
+The application connects to a PostgreSQL database and external APIs using environment variables:
 - `user`: Database username
 - `password`: Database password  
 - `host`: Database host
 - `port`: Database port (default: 5432)
 - `dbname`: Database name
 - `BedrockRegion`: AWS Bedrock region (optional, defaults to us-west-2)
+- `GeminiApiKey`: Google Gemini API key for chart insights and title suggestions
 
 For local development, create a `.env` file with these variables. In AWS, these are configured as Lambda environment variables via CloudFormation template parameters.
 
@@ -154,6 +157,9 @@ function/
 ├── tools/
 │   └── sql_tools.py      # Database interaction tools
 └── requirements.txt      # Python dependencies
+function-gemini/          # Gemini API proxy Lambda function
+├── index.js             # Node.js handler with dynamic CORS
+└── package.json         # Node.js dependencies
 deployment/               # AWS deployment scripts
 ├── deploy-all.sh         # Combined deployment pipeline
 ├── template.yml          # CloudFormation infrastructure template
@@ -182,7 +188,7 @@ Use this event JSON in AWS Lambda console to test the deployed function. Note th
   "requestContext": {
     "routeKey": "sendmessage",
     "connectionId": "test-connection-123",
-    "domainName": "15fdvwkqa7.execute-api.us-west-1.amazonaws.com",
+    "domainName": "hqmrrdbtqd.execute-api.us-west-1.amazonaws.com",
     "stage": "prod"
   },
   "body": "{\"prompt\": \"Generate chart of patient age and cancer risk.\"}"
@@ -194,7 +200,7 @@ Postman is the best way to test as it allows you to see all streamed responses i
 
 1. Create a new WebSocket connection to:
    ```
-   wss://15fdvwkqa7.execute-api.us-west-1.amazonaws.com/prod
+   wss://hqmrrdbtqd.execute-api.us-west-1.amazonaws.com/prod
    ```
 
 2. After the WebSocket is connected, send this message:
@@ -204,15 +210,29 @@ Postman is the best way to test as it allows you to see all streamed responses i
    }
    ```
 
-### API Gateway Testing
-The function expects POST requests with JSON body containing a 'prompt' field:
+Returns Chart.js JSON or error messages in standardized format.
+
+### Gemini Proxy API Testing
+The Gemini API proxy is available at a separate endpoint for chart insights and title suggestions.
+
+**Endpoint URL:**
+```
+https://6alcfdn1q1.execute-api.us-west-1.amazonaws.com/prod
+```
+
+**Request Format:**
 ```json
 {
-  "prompt": "Show me sales by region as a bar chart"
+  "contents": [{
+    "parts": [{
+      "text": "Explain how AI works in a few words"
+    }]
+  }]
 }
 ```
 
-Returns either Chart.js JSON or error messages in standardized format.
+**Response Format:**
+Returns Gemini API-compatible response with generated content and metadata.
 
 ## Advanced Features
 
@@ -232,7 +252,10 @@ Returns either Chart.js JSON or error messages in standardized format.
 ### Infrastructure as Code
 - **Complete AWS Stack**: CloudFormation template defines all resources
 - **WebSocket API**: API Gateway WebSocket API with proper routing
+- **REST API Proxy**: Gemini API proxy with dynamic CORS handling
+- **Rate Limiting**: Both APIs limited to 50 requests/second with 100 burst capacity
 - **Lambda Layer**: Optimized dependency packaging for faster cold starts
+- **Multi-Runtime Support**: Python 3.11 for main agent, Node.js 18 for Gemini proxy
 - **IAM Permissions**: Least-privilege security model
 - **Environment Variables**: Secure parameter passing via CloudFormation
 
@@ -241,3 +264,9 @@ Returns either Chart.js JSON or error messages in standardized format.
 - **Schema Isolation**: Restricted to 'ReportingWithAIAgent' schema
 - **Query Validation**: SQL injection protection through parameterized queries
 - **Connection Management**: Proper database connection lifecycle handling
+
+### Rate Limiting
+- **Chart Generation API**: 50 requests/second with 100 burst capacity
+- **Gemini Proxy API**: 50 requests/second with 100 burst capacity
+- **Throttling Response**: HTTP 429 (Too Many Requests) when limits exceeded
+- **Automatic Recovery**: Rate limits reset automatically after the time window
