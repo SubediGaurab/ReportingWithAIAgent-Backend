@@ -150,7 +150,7 @@ The Gemini API proxy is deployed as a separate Lambda function for chart insight
 
 **Endpoint URL:**
 ```
-https://6alcfdn1q1.execute-api.us-west-1.amazonaws.com/prod
+https://<your-gemini-api-id>.execute-api.<region>.amazonaws.com/prod
 ```
 
 **Request Format:**
@@ -169,7 +169,7 @@ Returns Gemini API-compatible response with generated content and metadata.
 
 **Usage Example:**
 ```bash
-curl -X POST https://6alcfdn1q1.execute-api.us-west-1.amazonaws.com/prod \
+curl -X POST https://<your-gemini-api-id>.execute-api.<region>.amazonaws.com/prod \
   -H "Content-Type: application/json" \
   -d '{
     "contents": [{
@@ -185,7 +185,7 @@ curl -X POST https://6alcfdn1q1.execute-api.us-west-1.amazonaws.com/prod \
 - `boto3==1.38.42`: AWS SDK for Bedrock agent runtime
 - `psycopg2-binary==2.9.10`: PostgreSQL database adapter
 - `jsonpickle==4.1.1`: JSON serialization for logging
-- **InlineAgent Library**: Custom Bedrock agent wrapper with observability and streaming support
+- **InlineAgent Library**: Custom Bedrock agent wrapper with observability and streaming support (source code copied and modified from [AWS InlineAgent samples](https://github.com/awslabs/amazon-bedrock-agent-samples/tree/main/src/InlineAgent))
 - `termcolor` & `rich`: Enhanced logging and console output for agent traces
 
 ## Agent Behavior

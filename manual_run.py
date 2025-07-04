@@ -24,7 +24,7 @@ def create_mock_event(prompt: str, route_key: str = 'sendmessage'):
         'requestContext': {
             'routeKey': route_key,
             'connectionId': 'mock-connection-123',
-            'domainName': 'mock-api.execute-api.us-east-1.amazonaws.com',
+            'domainName': 'mock-api.execute-api.<region>.amazonaws.com',
             'stage': 'dev'
         },
         'body': json.dumps({"prompt": prompt}) if route_key != '$connect' and route_key != '$disconnect' else '{}'

@@ -123,7 +123,7 @@ For local development, create a `.env` file with these variables. In AWS, these 
 - `boto3==1.38.42`: AWS SDK for Bedrock agent runtime
 - `psycopg2-binary==2.9.10`: PostgreSQL database adapter
 - `jsonpickle==4.1.1`: JSON serialization for logging
-- **InlineAgent Library**: Custom Bedrock agent wrapper with observability and streaming support
+- **InlineAgent Library**: Custom Bedrock agent wrapper with observability and streaming support (source code copied and modified from [AWS InlineAgent samples](https://github.com/awslabs/amazon-bedrock-agent-samples/tree/main/src/InlineAgent))
 - `termcolor` & `rich`: Enhanced logging and console output for agent traces
 
 ## Agent Behavior
@@ -188,7 +188,7 @@ Use this event JSON in AWS Lambda console to test the deployed function. Note th
   "requestContext": {
     "routeKey": "sendmessage",
     "connectionId": "test-connection-123",
-    "domainName": "hqmrrdbtqd.execute-api.us-west-1.amazonaws.com",
+    "domainName": "<your-api-id>.execute-api.<region>.amazonaws.com",
     "stage": "prod"
   },
   "body": "{\"prompt\": \"Generate chart of patient age and cancer risk.\"}"
@@ -200,7 +200,7 @@ Postman is the best way to test as it allows you to see all streamed responses i
 
 1. Create a new WebSocket connection to:
    ```
-   wss://hqmrrdbtqd.execute-api.us-west-1.amazonaws.com/prod
+   wss://<your-api-id>.execute-api.<region>.amazonaws.com/prod
    ```
 
 2. After the WebSocket is connected, send this message:
@@ -217,7 +217,7 @@ The Gemini API proxy is available at a separate endpoint for chart insights and 
 
 **Endpoint URL:**
 ```
-https://6alcfdn1q1.execute-api.us-west-1.amazonaws.com/prod
+https://<your-gemini-api-id>.execute-api.<region>.amazonaws.com/prod
 ```
 
 **Request Format:**
