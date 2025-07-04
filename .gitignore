@@ -34,6 +34,9 @@ ENV/
 *.swp
 *.swo
 
+.github/
+.claude/
+
 # AWS
 .aws-sam/
 samconfig.toml
