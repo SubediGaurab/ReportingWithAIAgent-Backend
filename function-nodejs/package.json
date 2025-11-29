@@ -1,0 +1,29 @@
+{
+  "name": "reportingwithai-agent-nodejs",
+  "version": "2.0.0",
+  "description": "Node.js/TypeScript Lambda for chart generation with Claude Agent SDK",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --platform=node --target=node18 --outfile=dist/index.js --external:@aws-sdk/* --external:aws-sdk --external:@anthropic-ai/claude-agent-sdk --external:@modelcontextprotocol/sdk && esbuild src/manual_run.ts --bundle --platform=node --target=node18 --outfile=dist/manual_run.js --external:@aws-sdk/* --external:aws-sdk --external:@anthropic-ai/claude-agent-sdk --external:@modelcontextprotocol/sdk && cp src/agent/system-prompt.md dist/system-prompt.md",
+    "dev": "ts-node src/manual_run.ts",
+    "dev:dist": "node dist/manual_run.js",
+    "test": "jest",
+    "clean": "rm -rf dist node_modules"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "latest",
+    "@aws-sdk/client-apigatewaymanagementapi": "^3.700.0",
+    "@modelcontextprotocol/sdk": "latest",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.145",
+    "@types/node": "^18.19.59",
+    "esbuild": "^0.24.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

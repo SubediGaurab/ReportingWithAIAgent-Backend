@@ -1,35 +1,55 @@
 #!/bin/bash
 set -eo pipefail
 
-# Copy requirements.txt to current directory
-cp ../function/requirements.txt .
+echo "Building Node.js Lambda layer..."
 
 # Clean up any existing artifacts
-rm -rf artifacts/package artifacts/layer.zip
+rm -rf artifacts/package artifacts/layer.zip artifacts/function.zip
 
 # Create layer package directory
-mkdir -p artifacts/package/python
+mkdir -p artifacts/package/nodejs
 
-# Install dependencies into layer package
-docker run \
-    --platform linux/amd64 \
-    --rm \
-    -v "$(pwd)":/var/task \
-    -w /var/task \
-    --user "$(id -u):$(id -g)" \
-    --entrypoint bash \
-    amazon/aws-lambda-python:3.11-x86_64 \
-    -c "pip install --target artifacts/package/python -r requirements.txt"
+# Install dependencies and build
+echo "Installing Node.js dependencies..."
+cd ../function-nodejs
+npm install
+
+# Build TypeScript code
+echo "Building Lambda function code..."
+npm run build
+
+# Prune dev dependencies for layer
+echo "Pruning dev dependencies..."
+npm prune --production
+cd ../deployment
+
+# Copy node_modules to layer package
+cp -r ../function-nodejs/node_modules artifacts/package/nodejs/
 
 # Create layer zip file
 cd artifacts/package
-zip -r ../layer.zip .
+zip -r -q ../layer.zip .
 cd ../..
 
-# Clean up package directory after successful zip creation
-rm -rf artifacts/package
-
-# Remove copied requirements.txt to avoid confusion
-rm -f requirements.txt
-
 echo "Layer package created: artifacts/layer.zip"
+echo "Layer size: $(du -h artifacts/layer.zip | cut -f1)"
+
+# Create function deployment package
+cd ../deployment
+mkdir -p artifacts/function-package
+cp ../function-nodejs/dist/index.js artifacts/function-package/
+cp ../function-nodejs/src/agent/system-prompt.md artifacts/function-package/
+cd artifacts/function-package
+zip -r -q ../function.zip .
+cd ../..
+
+echo "Function package created: artifacts/function.zip"
+echo "Function size: $(du -h artifacts/function.zip | cut -f1)"
+
+# Clean up temporary directories
+rm -rf artifacts/package artifacts/function-package
+
+echo ""
+echo "Build complete!"
+echo "Layer: deployment/artifacts/layer.zip"
+echo "Function: deployment/artifacts/function.zip"

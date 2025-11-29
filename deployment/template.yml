@@ -1,33 +1,26 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: ReportingWithAIAgent Backend - Lambda function with Bedrock agent for chart generation
+Description: ReportingWithAIAgent Backend - Node.js Lambda function with Claude Agent SDK for chart generation
 
 Parameters:
-  DBUser:
+  AnthropicApiKey:
     Type: String
-    Description: Database username
-    Default: ''
-  DBPassword:
-    Type: String
-    Description: Database password
+    Description: Anthropic API Key for Claude Agent SDK
     NoEcho: true
-    Default: ''
-  DBHost:
-    Type: String
-    Description: Database host
-    Default: ''
-  DBPort:
-    Type: String
-    Description: Database port
-    Default: '5432'
-  DBName:
-    Type: String
-    Description: Database name
     Default: ''
   BedrockRegion:
     Type: String
-    Description: AWS Bedrock Region
+    Description: AWS Region for Bedrock
     Default: 'us-west-2'
+  SupabaseProjectRef:
+    Type: String
+    Description: Supabase Project Reference
+    Default: ''
+  SupabaseAccessToken:
+    Type: String
+    Description: Supabase Access Token
+    NoEcho: true
+    Default: ''
   GeminiApiKey:
     Type: String
     Description: "Your Google Gemini API Key for title suggestions and insights"
@@ -38,36 +31,26 @@ Resources:
     Type: AWS::Serverless::Function
     DeletionPolicy: Delete
     Properties:
-      FunctionName: ReportingWithAIAgent-Backend
-      CodeUri: ../function/
-      Handler: lambda_function.lambda_handler
-      Runtime: python3.11
+      FunctionName: ReportingWithAIAgent-Backend-Nodejs
+      CodeUri: artifacts/function.zip
+      Handler: index.handler
+      Runtime: nodejs18.x
       Architectures:
         - x86_64
-      Timeout: 300
+      Timeout: 30
       MemorySize: 512
       Layers:
         - !Ref DependenciesLayer
       Environment:
         Variables:
-          user: !Ref DBUser
-          password: !Ref DBPassword
-          host: !Ref DBHost
-          port: !Ref DBPort
-          dbname: !Ref DBName
-          BedrockRegion: !Ref BedrockRegion
+          ANTHROPIC_API_KEY: !Ref AnthropicApiKey
+          SUPABASE_PROJECT_REF: !Ref SupabaseProjectRef
+          SUPABASE_ACCESS_TOKEN: !Ref SupabaseAccessToken
+          BEDROCK_REGION: !Ref BedrockRegion
+          LOG_LEVEL: INFO
       Policies:
         - Version: '2012-10-17'
           Statement:
-            - Effect: Allow
-              Action:
-                - bedrock:InvokeInlineAgent
-                - bedrock:InvokeModel
-                - bedrock:InvokeModelWithResponseStream
-                - bedrock:GetFoundationModel
-                - bedrock:ListFoundationModels
-                - bedrock:GetModelInvocationLoggingConfiguration
-              Resource: '*'
             - Effect: Allow
               Action:
                 - logs:CreateLogGroup
@@ -83,11 +66,11 @@ Resources:
     Type: AWS::Serverless::LayerVersion
     DeletionPolicy: Delete
     Properties:
-      LayerName: ReportingAgent-Dependencies
-      Description: Dependencies for ReportingWithAIAgent Backend
+      LayerName: ReportingAgent-Dependencies-Nodejs
+      Description: Node.js dependencies for ReportingWithAIAgent Backend (Claude Agent SDK)
       ContentUri: artifacts/layer.zip
       CompatibleRuntimes:
-        - python3.11
+        - nodejs18.x
 
   ReportingAgentWebSocketApi:
     Type: AWS::ApiGatewayV2::Api

@@ -2,6 +2,10 @@
 set -eo pipefail
 
 # Generate unique bucket name
+if [ -z "$AWS_DEFAULT_REGION" ]; then
+    AWS_DEFAULT_REGION=$(aws configure get region)
+fi
+
 BUCKET_NAME=lambda-artifacts-reportingwithaiagent-$(date +%s)
 echo $BUCKET_NAME > artifacts/bucket-name.txt
 

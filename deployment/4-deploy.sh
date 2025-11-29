@@ -25,11 +25,8 @@ aws cloudformation deploy \
     --stack-name $STACK_NAME \
     --capabilities CAPABILITY_IAM \
     --parameter-overrides \
-        DBUser="${user}" \
-        DBPassword="${password}" \
-        DBHost="${host}" \
-        DBPort="${port}" \
-        DBName="${dbname}" \
+        SupabaseProjectRef="${SUPABASE_PROJECT_REF}" \
+        SupabaseAccessToken="${SUPABASE_ACCESS_TOKEN}" \
         BedrockRegion="${BedrockRegion}" \
         GeminiApiKey="${GeminiApiKey}"
 

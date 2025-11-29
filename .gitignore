@@ -45,3 +45,10 @@ deployment/artifacts/
 
 # Misc
 .DS_Store
+
+
+.bmad/
+docs/
+
+node_modules/
+.mcp.js

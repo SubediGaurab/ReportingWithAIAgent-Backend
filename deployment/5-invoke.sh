@@ -9,7 +9,7 @@ if [ ! -f artifacts/test-event.json ]; then
     cat > artifacts/test-event.json << 'EOF'
 {
   "requestContext": {
-    "routeKey": "sendmessage",
+    "routeKey": "$default",
     "connectionId": "test-connection-123",
     "domainName": "<your-api-id>.execute-api.<region>.amazonaws.com",
     "stage": "prod"
