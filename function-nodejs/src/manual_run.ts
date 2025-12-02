@@ -1,12 +1,11 @@
 import { config } from 'dotenv';
-import { resolve, dirname } from 'path';
-import { fileURLToPath, pathToFileURL } from 'url';
+import { resolve } from 'path';
 import { APIGatewayProxyWebsocketEventV2 } from 'aws-lambda';
-import { handler } from './index.js';
-import { WebSocketClient } from './utils/websocket-client.js';
+import { handler } from './index';
+import { WebSocketClient } from './utils/websocket-client';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+// In CommonJS, __dirname is automatically available
+// No need for import.meta.url
 
 // Load .env from project root directory
 config({ path: resolve(__dirname, '../../.env') });
@@ -113,6 +112,7 @@ async function main() {
   }
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+// In CommonJS, check if this is the main module
+if (require.main === module) {
   main();
 }

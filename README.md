@@ -1,14 +1,14 @@
 # ReportingWithAIAgent Backend
 
-An AWS Lambda-based AI agent that generates Chart.js-compatible JSON from natural language prompts by querying a Supabase PostgreSQL database. The system uses **LangGraph** with **MCP (Model Context Protocol) servers** for database access and real-time WebSocket streaming to interpret user requests and generate data visualizations. Additionally, it includes a Gemini API proxy for chart insights and title suggestions with dynamic CORS support.
+An AWS Lambda-based AI agent that generates Chart.js-compatible JSON from natural language prompts by querying a Supabase PostgreSQL database. The system uses **Anthropic SDK** with a **custom MCP (Model Context Protocol) client** for database access and real-time WebSocket streaming to interpret user requests and generate data visualizations. Additionally, it includes a Gemini API proxy for chart insights and title suggestions with dynamic CORS support.
 
 ## Architecture
 
 The application follows a serverless architecture with these key components:
 
 - **Lambda Handler** (`function-nodejs/src/index.ts`): Main entry point handling WebSocket API Gateway requests with real-time streaming
-- **LangGraph Agent** (`function-nodejs/src/agent/`): Modern agent orchestration using LangGraph framework
-- **MCP Client** (`function-nodejs/src/agent/mcp-client.ts`): Model Context Protocol integration for database access via Supabase MCP server
+- **Agent Implementation** (`function-nodejs/src/agent/`): Anthropic SDK-based agent with custom MCP integration
+- **Agent Config** (`function-nodejs/src/agent/agent-config.ts`): Anthropic SDK configuration with custom Supabase MCP client
 - **Streaming Handler** (`function-nodejs/src/agent/streaming.ts`): Real-time response streaming to WebSocket clients
 - **System Prompt** (`function-nodejs/src/agent/system-prompt.md`): Detailed instructions for the AI agent behavior
 - **Gemini Proxy** (`function-gemini/index.js`): Node.js Lambda proxy for Gemini API with dynamic CORS handling
@@ -25,14 +25,16 @@ The system implements real-time streaming through AWS API Gateway WebSocket API:
 
 ### Technology Migration
 
-**From:** Python + AWS InlineAgent + Custom PostgreSQL Tools  
-**To:** Node.js/TypeScript + LangGraph + MCP Servers
+**Migration 1:** Python + AWS InlineAgent + Custom PostgreSQL Tools → Node.js/TypeScript + LangGraph + MCP Servers
+**Migration 2 (Latest):** LangGraph + @langchain/mcp-adapters → Anthropic SDK + Custom MCP Client
 
 ### Key Benefits:
-1. **LangGraph** is a more standard and widely adopted agentic framework
-2. **MCP Servers** eliminate custom database tools and platform-dependent libraries
-3. **TypeScript** provides type safety and better developer experience
-4. **Cleaner Architecture** with better separation of concerns
+1. **Anthropic SDK** is the official SDK with direct Claude API access
+2. **Custom MCP Client** eliminates framework overhead and provides direct control
+3. **Simplified Architecture** with minimal dependencies and cleaner code
+4. **Better Reliability** with official SDK and direct HTTP communication
+5. **Node.js 24 LTS** provides latest runtime features and long-term support until 2028
+6. **No CLI Dependencies** - pure SDK implementation works perfectly in Lambda
 
 The agent is configured to:
 1. Only create one chart per request
@@ -70,7 +72,7 @@ npm run build
 
 Create a `.env` file in the project root with these keys:
 ```bash
-# Anthropic API (for Claude model via LangGraph)
+# Anthropic API (for Claude model via Anthropic SDK)
 ANTHROPIC_API_KEY=your_anthropic_api_key
 
 # Supabase Database Connection (for MCP server)
@@ -102,7 +104,7 @@ cd deployment
 
 The script will:
 1. Create S3 bucket for artifacts
-2. Build Lambda layer with Node.js dependencies
+2. Build Lambda function with bundled dependencies
 3. Export environment variables from `.env` file
 4. Deploy CloudFormation stack
 5. Clean up S3 artifacts
@@ -113,8 +115,8 @@ The script will:
 # Create S3 bucket for deployment artifacts
 ./1-create-bucket.sh
 
-# Build Lambda layer with dependencies
-./2-build-layer.sh
+# Build Lambda function with bundled dependencies
+./2-build-function.sh
 
 # Export environment variables from .env file (MUST use source)
 source ./3-export-env.sh
@@ -219,22 +221,20 @@ curl -X POST https://<your-gemini-api-id>.execute-api.<region>.amazonaws.com/pro
 ## Key Dependencies
 
 ### Main Lambda Function (Node.js/TypeScript)
-- `langchain ^1.1.1`: LangGraph framework for agent orchestration
-- `@langchain/anthropic ^1.1.3`: Anthropic Claude integration
-- `@langchain/mcp-adapters ^1.0.1`: Model Context Protocol adapters for tool integration
+- `@anthropic-ai/sdk ^0.71.0`: Official Anthropic SDK for Claude API
 - `@aws-sdk/client-apigatewaymanagementapi ^3.700.0`: AWS SDK for WebSocket API management
 - `dotenv ^16.4.5`: Environment variable management
 
 ### Development Dependencies
 - `typescript ^5.7.2`: TypeScript compiler
-- `esbuild ^0.24.0`: Fast bundler for Lambda deployment
-- `tsx ^4.19.2`: TypeScript execution for development
-- `@types/node ^18.19.59`: Node.js type definitions
+- `tsup ^8.5.1`: Modern bundler built on esbuild with optimized defaults
+- `ts-node ^10.9.2`: TypeScript execution for development
+- `@types/node`: Node.js type definitions (Node 24+)
 - `@types/aws-lambda ^8.10.145`: AWS Lambda type definitions
 
 ## Agent Behavior
 
-The LangGraph agent is configured to:
+The agent is configured to:
 - Only process chart generation requests
 - Always query the 'ReportingWithAIAgent' schema via Supabase MCP
 - Enforce read-only database access (SELECT queries only)
@@ -251,10 +251,9 @@ function-nodejs/               # Main Lambda function (Node.js/TypeScript)
 ├── src/
 │   ├── index.ts              # WebSocket API Gateway handler
 │   ├── manual_run.ts         # Local development testing utility
-│   ├── agent/               # LangGraph agent implementation
-│   │   ├── agent-config.ts  # LangGraph agent configuration
-│   │   ├── streaming.ts     # Real-time streaming handler
-│   │   ├── mcp-client.ts    # MCP server client for Supabase
+│   ├── agent/               # Agent implementation with Anthropic SDK
+│   │   ├── agent-config.ts  # Anthropic SDK configuration with custom MCP client
+│   │   ├── streaming.ts     # Real-time streaming handler for agent responses
 │   │   ├── system-prompt.md # AI agent instructions
 │   │   └── system-prompt.ts # System prompt loader
 │   ├── utils/              # Utility modules
@@ -263,8 +262,7 @@ function-nodejs/               # Main Lambda function (Node.js/TypeScript)
 │   │   └── error-handler.ts    # Error handling
 │   └── types/              # TypeScript type definitions
 │       ├── environment.ts   # Environment variable types
-│       ├── websocket.ts     # WebSocket message types
-│       └── langchain.ts     # LangGraph-related types
+│       └── websocket.ts     # WebSocket message types
 ├── package.json            # Node.js dependencies
 ├── tsconfig.json           # TypeScript configuration
 └── dist/                   # Built JavaScript (generated)
@@ -277,7 +275,7 @@ deployment/                # AWS deployment scripts
 ├── deploy-all.sh          # Combined deployment pipeline
 ├── template.yml           # CloudFormation infrastructure template
 ├── 1-create-bucket.sh
-├── 2-build-layer.sh       # Builds Node.js Lambda layer
+├── 2-build-function.sh    # Builds Lambda function with bundled dependencies
 ├── 3-export-env.sh
 ├── 4-deploy.sh
 ├── 5-invoke.sh
@@ -288,11 +286,12 @@ deployment/                # AWS deployment scripts
 
 ## Advanced Features
 
-### LangGraph Integration
-- **Modern Agent Framework**: Industry-standard agentic framework with graph-based orchestration
-- **MCP Protocol**: Standardized tool integration via Model Context Protocol
+### Anthropic SDK Integration
+- **Official SDK**: Anthropic's official SDK for Claude API
+- **Custom MCP Client**: Direct HTTP communication with Supabase MCP server
 - **Type Safety**: Full TypeScript support for better developer experience
-- **Extensibility**: Easy to add new tools and capabilities via MCP servers
+- **Simplified Architecture**: Minimal dependencies and cleaner code structure
+- **No CLI Dependencies**: Pure SDK implementation without subprocess overhead
 
 ### Real-time Streaming
 - **WebSocket Streaming**: Agent responses streamed in real-time to clients
@@ -305,8 +304,8 @@ deployment/                # AWS deployment scripts
 - **WebSocket API**: API Gateway WebSocket API with proper routing
 - **REST API Proxy**: Gemini API proxy with dynamic CORS handling
 - **Rate Limiting**: Both APIs limited to 50 requests/second with 100 burst capacity
-- **Lambda Layer**: Optimized Node.js dependency packaging for faster cold starts
-- **Node.js 18 Runtime**: Modern runtime for both Lambda functions
+- **Bundled Dependencies**: Dependencies bundled directly into function package for optimal performance
+- **Node.js 24 Runtime**: Latest LTS runtime with support until April 2028
 - **IAM Permissions**: Least-privilege security model
 - **Environment Variables**: Secure parameter passing via CloudFormation
 
@@ -331,17 +330,41 @@ deployment/                # AWS deployment scripts
 
 ## Migration Notes
 
-This project was migrated from Python + AWS InlineAgent to Node.js/TypeScript + LangGraph:
+This project has undergone two major migrations:
 
-### Why LangGraph?
-- **Industry Standard**: More widely adopted than AWS InlineAgent
-- **Better Tooling**: Excellent TypeScript support and developer experience
-- **Flexibility**: Easier to customize and extend agent behavior
-- **Community**: Larger ecosystem and better documentation
+### Migration 1: Python → Node.js/TypeScript + LangGraph
+Migrated from Python + AWS InlineAgent to Node.js/TypeScript + LangGraph for better tooling, TypeScript support, and standardization.
 
-### Why MCP Servers?
+### Migration 2: LangGraph → Anthropic SDK + Custom MCP Client (December 2024)
+**Why Anthropic SDK with Custom MCP Client?**
+- **Official Solution**: Anthropic's official SDK for Claude API
+- **Direct Control**: Custom MCP client with direct HTTP communication
+- **Simplified Architecture**: Minimal dependencies (just the SDK + AWS SDK)
+- **Better Performance**: No framework overhead or adapter layers
+- **Lambda-Optimized**: No CLI dependencies or subprocess overhead
+- **Future-proof**: Official SDK support and updates from Anthropic
+- **Cleaner Code**: Straightforward agentic loop implementation
+
+**Key Changes:**
+- Replaced `langchain`, `@langchain/anthropic`, `@langchain/mcp-adapters`
+- Added `@anthropic-ai/sdk` (official Claude API SDK)
+- Implemented custom MCP client for Supabase (direct JSON-RPC over HTTP)
+- Simplified streaming handler (direct SDK message types)
+- Updated to Node.js 24 LTS (support until April 2028)
+- Maintained CommonJS build for Lambda compatibility
+- Reduced to minimal dependencies for maximum reliability
+
+**What Stayed the Same:**
+- tsup build system with optimized bundling
+- WebSocket streaming architecture
+- All utility modules (logger, error-handler, websocket-client)
+- System prompt and agent behavior
+- CloudFormation infrastructure
+- Bundled deployment approach
+
+### Why MCP?
 - **Standardization**: MCP is an emerging standard for AI tool integration
-- **Portability**: Same MCP server can be used with different agents/frameworks
+- **Portability**: Same MCP protocol can be used with different agents/frameworks
 - **No Platform Lock-in**: Eliminates dependency on platform-specific libraries
 - **Better Abstraction**: Clean separation between agent logic and database access
 

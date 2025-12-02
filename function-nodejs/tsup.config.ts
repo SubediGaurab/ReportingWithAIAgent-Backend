@@ -4,29 +4,27 @@ export default defineConfig([
   {
     name: 'lambda',
     entry: ['src/index.ts'],
-    format: 'esm',
+    format: 'cjs',
     platform: 'node',
-    target: 'node22',
+    target: 'node24',
     bundle: true,
-    minify: true,
-    sourcemap: false,
+    minify: false,
+    sourcemap: true,
     clean: true,
     outDir: 'dist',
     external: [
       '@aws-sdk/*',
-      'aws-sdk'
+      'aws-sdk',
+      '@anthropic-ai/claude-agent-sdk'
     ],
-    banner: {
-      js: "import { createRequire } from 'module'; const require = createRequire(import.meta.url);"
-    },
     onSuccess: 'cp src/agent/system-prompt.md dist/'
   },
   {
     name: 'dev',
     entry: ['src/manual_run.ts'],
-    format: 'esm',
+    format: 'cjs',
     platform: 'node',
-    target: 'node22',
+    target: 'node24',
     bundle: true,
     minify: false,
     sourcemap: true,

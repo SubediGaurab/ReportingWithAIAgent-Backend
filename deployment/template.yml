@@ -1,11 +1,11 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: ReportingWithAIAgent Backend - Node.js Lambda function with LangChain for chart generation
+Description: ReportingWithAIAgent Backend - Node.js Lambda function with Claude Agent SDK for chart generation
 
 Parameters:
   AnthropicApiKey:
     Type: String
-    Description: Anthropic API Key for Claude/LangChain
+    Description: Anthropic API Key for Claude Agent SDK
     NoEcho: true
     Default: ''
   SupabaseProjectRef:
@@ -30,7 +30,7 @@ Resources:
       FunctionName: ReportingWithAIAgent-Backend-Nodejs
       CodeUri: artifacts/function.zip
       Handler: index.handler
-      Runtime: nodejs22.x
+      Runtime: nodejs24.x
       Architectures:
         - x86_64
       Timeout: 60
