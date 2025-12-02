@@ -104,15 +104,23 @@ async function handleMessage(event: APIGatewayProxyWebsocketEventV2): Promise<AP
       promptLength: request.prompt.length,
     });
 
-    // Stream agent response to WebSocket
-    // This is a fire-and-forget operation - we return immediately
-    // while the agent continues processing and streaming results
-    streamAgentResponseToWebSocket(connectionId, request.prompt, wsClient).catch(error => {
+    try {
+      // CRITICAL: We MUST await this promise to keep the Lambda alive.
+      await streamAgentResponseToWebSocket(connectionId, request.prompt, wsClient);
+    } catch (error) {
+      // Detailed logging and error handling
       logger.error('Unhandled error in agent streaming', {
         connectionId,
-        error: error instanceof Error ? error.message : error,
+        error: error instanceof Error? error.message : error,
       });
-    });
+      
+      // Attempt to notify the client of the failure before exiting
+      try {
+        await wsClient.sendError(connectionId, 'Internal processing error');
+      } catch (e) {
+        logger.warn('Failed to send error frame', { connectionId });
+      }
+    }
 
     return {
       statusCode: 200,
