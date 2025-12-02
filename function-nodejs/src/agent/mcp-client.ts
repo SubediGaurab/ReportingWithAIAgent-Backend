@@ -4,7 +4,7 @@
  */
 
 import { MultiServerMCPClient } from '@langchain/mcp-adapters';
-import { logger } from '../utils/logger';
+import { logger } from '../utils/logger.js';
 
 /**
  * Create and configure MCP client for Supabase

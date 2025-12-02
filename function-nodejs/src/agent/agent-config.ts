@@ -5,9 +5,9 @@
 
 import { createAgent } from 'langchain';
 import { ChatAnthropic } from '@langchain/anthropic';
-import { CHART_GENERATION_SYSTEM_PROMPT } from './system-prompt';
-import { createMCPClient } from './mcp-client';
-import { logger } from '../utils/logger';
+import { CHART_GENERATION_SYSTEM_PROMPT } from './system-prompt.js';
+import { createMCPClient } from './mcp-client.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * Create a LangGraph agent for chart generation

@@ -6,7 +6,7 @@ import {
   ApiGatewayManagementApiClient,
   PostToConnectionCommand,
 } from '@aws-sdk/client-apigatewaymanagementapi';
-import { logger } from './logger';
+import { logger } from './logger.js';
 
 export class WebSocketClient {
   private client: ApiGatewayManagementApiClient;

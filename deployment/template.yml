@@ -8,10 +8,6 @@ Parameters:
     Description: Anthropic API Key for Claude/LangChain
     NoEcho: true
     Default: ''
-  BedrockRegion:
-    Type: String
-    Description: AWS Region for Bedrock
-    Default: 'us-west-2'
   SupabaseProjectRef:
     Type: String
     Description: Supabase Project Reference
@@ -34,19 +30,16 @@ Resources:
       FunctionName: ReportingWithAIAgent-Backend-Nodejs
       CodeUri: artifacts/function.zip
       Handler: index.handler
-      Runtime: nodejs18.x
+      Runtime: nodejs22.x
       Architectures:
         - x86_64
-      Timeout: 30
+      Timeout: 60
       MemorySize: 512
-      Layers:
-        - !Ref DependenciesLayer
       Environment:
         Variables:
           ANTHROPIC_API_KEY: !Ref AnthropicApiKey
           SUPABASE_PROJECT_REF: !Ref SupabaseProjectRef
           SUPABASE_ACCESS_TOKEN: !Ref SupabaseAccessToken
-          BEDROCK_REGION: !Ref BedrockRegion
           LOG_LEVEL: INFO
       Policies:
         - Version: '2012-10-17'
@@ -56,21 +49,15 @@ Resources:
                 - logs:CreateLogGroup
                 - logs:CreateLogStream
                 - logs:PutLogEvents
-              Resource: '*'
+              Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/ReportingWithAIAgent-Backend-Nodejs:*'
             - Effect: Allow
               Action:
                 - execute-api:ManageConnections
-              Resource: '*'
-
-  DependenciesLayer:
-    Type: AWS::Serverless::LayerVersion
-    DeletionPolicy: Delete
-    Properties:
-      LayerName: ReportingAgent-Dependencies-Nodejs
-      Description: Node.js dependencies for ReportingWithAIAgent Backend (LangChain + MCP Adapters)
-      ContentUri: artifacts/layer.zip
-      CompatibleRuntimes:
-        - nodejs18.x
+              Resource: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ReportingAgentWebSocketApi}/*'
+      Tags:
+        Project: ReportingWithAIAgent
+        Environment: !Ref AWS::StackName
+        ManagedBy: CloudFormation
 
   ReportingAgentWebSocketApi:
     Type: AWS::ApiGatewayV2::Api
@@ -79,6 +66,18 @@ Resources:
       Name: ReportingWithAIAgent-WebSocket-API
       ProtocolType: WEBSOCKET
       RouteSelectionExpression: $request.body.action
+      Tags:
+        Project: ReportingWithAIAgent
+        Environment: !Ref AWS::StackName
+        ManagedBy: CloudFormation
+
+  # WebSocket Integration (single integration for all routes)
+  WebSocketIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref ReportingAgentWebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ReportingAgentFunction.Arn}/invocations'
 
   # WebSocket Routes
   ConnectRoute:
@@ -87,45 +86,23 @@ Resources:
       ApiId: !Ref ReportingAgentWebSocketApi
       RouteKey: $connect
       AuthorizationType: NONE
-      Target: !Sub 'integrations/${ConnectIntegration}'
-  
+      Target: !Sub 'integrations/${WebSocketIntegration}'
+
   DisconnectRoute:
     Type: AWS::ApiGatewayV2::Route
     Properties:
       ApiId: !Ref ReportingAgentWebSocketApi
       RouteKey: $disconnect
       AuthorizationType: NONE
-      Target: !Sub 'integrations/${DisconnectIntegration}'
-  
+      Target: !Sub 'integrations/${WebSocketIntegration}'
+
   DefaultRoute:
     Type: AWS::ApiGatewayV2::Route
     Properties:
       ApiId: !Ref ReportingAgentWebSocketApi
       RouteKey: $default
       AuthorizationType: NONE
-      Target: !Sub 'integrations/${DefaultIntegration}'
-
-  # WebSocket Integrations
-  ConnectIntegration:
-    Type: AWS::ApiGatewayV2::Integration
-    Properties:
-      ApiId: !Ref ReportingAgentWebSocketApi
-      IntegrationType: AWS_PROXY
-      IntegrationUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ReportingAgentFunction.Arn}/invocations'
-
-  DisconnectIntegration:
-    Type: AWS::ApiGatewayV2::Integration
-    Properties:
-      ApiId: !Ref ReportingAgentWebSocketApi
-      IntegrationType: AWS_PROXY
-      IntegrationUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ReportingAgentFunction.Arn}/invocations'
-
-  DefaultIntegration:
-    Type: AWS::ApiGatewayV2::Integration
-    Properties:
-      ApiId: !Ref ReportingAgentWebSocketApi
-      IntegrationType: AWS_PROXY
-      IntegrationUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ReportingAgentFunction.Arn}/invocations'
+      Target: !Sub 'integrations/${WebSocketIntegration}'
 
   # Lambda Permissions for WebSocket API
   ConnectPermission:
@@ -146,6 +123,13 @@ Resources:
     Properties:
       ApiId: !Ref ReportingAgentWebSocketApi
 
+  WebSocketLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    Properties:
+      LogGroupName: !Sub '/aws/apigateway/${ReportingAgentWebSocketApi}'
+      RetentionInDays: 7
+
   ReportingAgentWebSocketStage:
     Type: AWS::ApiGatewayV2::Stage
     Properties:
@@ -155,6 +139,14 @@ Resources:
       DefaultRouteSettings:
         ThrottlingBurstLimit: 100
         ThrottlingRateLimit: 50
+        LoggingLevel: INFO
+      AccessLogSettings:
+        DestinationArn: !GetAtt WebSocketLogGroup.Arn
+        Format: '$context.requestId $context.routeKey $context.status'
+      Tags:
+        Project: ReportingWithAIAgent
+        Environment: !Ref AWS::StackName
+        ManagedBy: CloudFormation
 
   # Gemini API Proxy Resources
   # Using Lambda proxy instead of HTTP integration due to CORS limitation:
@@ -166,7 +158,7 @@ Resources:
       FunctionName: ReportingAgent-Gemini-Proxy
       CodeUri: ../function-gemini/
       Handler: index.handler
-      Runtime: nodejs18.x
+      Runtime: nodejs22.x
       Architectures:
         - x86_64
       Timeout: 30
@@ -181,6 +173,10 @@ Resources:
             Path: /
             Method: any
             RestApiId: !Ref GeminiProxyApi
+      Tags:
+        Project: ReportingWithAIAgent
+        Environment: !Ref AWS::StackName
+        ManagedBy: CloudFormation
 
   GeminiProxyApi:
     Type: AWS::Serverless::Api
@@ -188,15 +184,15 @@ Resources:
     Properties:
       Name: ReportingAgent-Gemini-Proxy
       StageName: prod
-      Cors:
-        AllowMethods: "'POST,OPTIONS'"
-        AllowHeaders: "'Content-Type'"
-        AllowOrigin: "'*'"  # Handled dynamically by Lambda function
       MethodSettings:
         - ResourcePath: "/*"
           HttpMethod: "*"
           ThrottlingRateLimit: 50
           ThrottlingBurstLimit: 100
+      Tags:
+        Project: ReportingWithAIAgent
+        Environment: !Ref AWS::StackName
+        ManagedBy: CloudFormation
 
 
 Outputs:

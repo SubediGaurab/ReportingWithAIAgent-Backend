@@ -4,11 +4,11 @@
  */
 
 import { APIGatewayProxyWebsocketEventV2, APIGatewayProxyResultV2 } from 'aws-lambda';
-import { WebSocketClient } from './utils/websocket-client';
-import { logger } from './utils/logger';
-import { handleError } from './utils/error-handler';
-import { streamAgentResponseToWebSocket } from './agent/streaming';
-import { WebSocketRequest } from './types/websocket';
+import { WebSocketClient } from './utils/websocket-client.js';
+import { logger } from './utils/logger.js';
+import { handleError } from './utils/error-handler.js';
+import { streamAgentResponseToWebSocket } from './agent/streaming.js';
+import { WebSocketRequest } from './types/websocket.js';
 
 /**
  * WebSocket connection handler

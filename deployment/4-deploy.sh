@@ -28,7 +28,6 @@ aws cloudformation deploy \
         AnthropicApiKey="${ANTHROPIC_API_KEY}" \
         SupabaseProjectRef="${SUPABASE_PROJECT_REF}" \
         SupabaseAccessToken="${SUPABASE_ACCESS_TOKEN}" \
-        BedrockRegion="${BedrockRegion}" \
         GeminiApiKey="${GeminiApiKey}"
 
 echo "Stack deployed successfully: $STACK_NAME"

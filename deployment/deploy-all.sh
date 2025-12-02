@@ -1,10 +1,14 @@
 #!/bin/bash
 set -eo pipefail
 
+# ReportingWithAIAgent Deployment Pipeline
+# Modern build system using tsup bundler with dependencies bundled directly into function
+# No separate Lambda Layer - simplified single-artifact deployment
+
 echo "=== ReportingWithAIAgent Full Deployment Pipeline ==="
 echo "This script will:"
 echo "1. Create S3 bucket for artifacts"
-echo "2. Build Lambda layer with dependencies"
+echo "2. Build Lambda function with bundled dependencies (no layer)"
 echo "3. Export environment variables"
 echo "4. Deploy CloudFormation stack"
 echo "5. Clean up S3 artifacts"
@@ -22,14 +26,14 @@ fi
 echo "✓ S3 bucket created successfully"
 echo ""
 
-# Step 2: Build Lambda layer
-echo "=== Step 2: Building Lambda layer ==="
-./2-build-layer.sh
+# Step 2: Build Lambda function
+echo "=== Step 2: Building Lambda function ==="
+./2-build-function.sh
 if [ $? -ne 0 ]; then
-    echo "ERROR: Failed to build Lambda layer"
+    echo "ERROR: Failed to build Lambda function"
     exit 1
 fi
-echo "✓ Lambda layer built successfully"
+echo "✓ Lambda function built successfully"
 echo ""
 
 # Step 3: Export environment variables
