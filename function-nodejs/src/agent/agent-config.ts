@@ -1,107 +1,67 @@
 /**
- * Claude Agent SDK configuration for chart generation
+ * LangGraph agent configuration for chart generation
+ * Migrated from Claude Agent SDK to LangGraph for AWS Lambda compatibility
  */
 
+import { createAgent } from 'langchain';
+import { ChatAnthropic } from '@langchain/anthropic';
 import { CHART_GENERATION_SYSTEM_PROMPT } from './system-prompt';
+import { createMCPClient } from './mcp-client';
 import { logger } from '../utils/logger';
-import path from 'path';
-
-const chartSchema = {
-  oneOf: [
-    {
-      type: "object",
-      properties: {
-        type: { type: "string" },
-        data: { type: "object" },
-        options: { type: "object" }
-      },
-      required: ["type", "data", "options"],
-      additionalProperties: false
-    },
-    {
-      type: "object",
-      properties: {
-        error: { type: "string" }
-      },
-      required: ["error"],
-      additionalProperties: false
-    }
-  ]
-} as const;
-
-
 
 /**
- * MCP server configuration based on environment variables
- * Uses Supabase MCP HTTP server
-*/
-function getMcpServerConfig() {
-  const mcpServers: any = {};
-
-  // Supabase MCP HTTP Server (like working example)
-  if (process.env.SUPABASE_PROJECT_REF && process.env.SUPABASE_ACCESS_TOKEN) {
-    const supabaseUrl = `https://mcp.supabase.com/mcp?project_ref=${process.env.SUPABASE_PROJECT_REF}`;
-
-    logger.info('Using Supabase MCP HTTP server', {
-      project_ref: process.env.SUPABASE_PROJECT_REF,
-    });
-
-    mcpServers.supabase = {
-      type: 'http',
-      url: supabaseUrl,
-      headers: {
-        'Authorization': `Bearer ${process.env.SUPABASE_ACCESS_TOKEN}`,
-      },
-    };
-  } else {
-    throw new Error('Missing Supabase MCP configuration. Set SUPABASE_PROJECT_REF and SUPABASE_ACCESS_TOKEN environment variables.');
-  }
-
-  return mcpServers;
-}
-
-/**
- * Create an agent query stream for chart generation
+ * Create a LangGraph agent for chart generation
+ * Returns an agent stream that can be consumed for real-time responses
  */
 export async function createChartGenerationAgent(userPrompt: string) {
-  logger.info('Creating chart generation agent', {
+  logger.info('Creating chart generation agent with LangGraph', {
     promptLength: userPrompt.length,
   });
 
-  const mcpServers = getMcpServerConfig();
+  // Validate required environment variable
+  if (!process.env.ANTHROPIC_API_KEY) {
+    throw new Error('Missing ANTHROPIC_API_KEY environment variable');
+  }
 
-  // In Lambda, layers are mounted at /opt/nodejs/node_modules
-  // Locally, it's in node_modules
-  const isLambda = process.env.AWS_EXECUTION_ENV !== undefined;
-  const cliPath = isLambda
-    ? '/opt/nodejs/node_modules/@anthropic-ai/claude-agent-sdk/cli.js'
-    : path.join(process.cwd(), 'node_modules/@anthropic-ai/claude-agent-sdk/cli.js');
+  // Initialize MCP client and get tools
+  const mcpClient = createMCPClient();
 
-  logger.info('CLI path configuration', {
-    isLambda,
-    cliPath,
+  logger.info('Retrieving MCP tools from Supabase');
+  const tools = await mcpClient.getTools();
+
+  logger.info('MCP tools loaded successfully', {
+    toolCount: tools.length,
+    toolNames: tools.map(t => t.name),
   });
 
-  // Use dynamic import to load ESM SDK from CommonJS code
-  const { query } = await import('@anthropic-ai/claude-agent-sdk');
+  logger.info('Creating Anthropic model');
 
-  const agentStream = query({
-    prompt: userPrompt,
-    options: {
-      systemPrompt: CHART_GENERATION_SYSTEM_PROMPT,
-      mcpServers,
-      permissionMode: 'bypassPermissions', // Lambda automation mode
-      model: 'claude-haiku-4-5',
+  // Initialize Anthropic model
+  const model = new ChatAnthropic({
+    model: 'claude-haiku-4-5',
+    apiKey: process.env.ANTHROPIC_API_KEY,
+    streaming: true,
+    temperature: 0,
+  });
 
-      // FIX: Provide explicit path to cli.js from Lambda layer
-      pathToClaudeCodeExecutable: cliPath,
-      // commenting out since it's expecting this format for tool call also
-      // outputFormat: {
-      //   type: 'json_schema',
-      //   schema: chartSchema
-      // },
+  logger.info('Creating LangGraph agent with tools and system prompt');
+
+  // Create agent with MCP tools and system prompt
+  const agent = createAgent({
+    model,
+    tools,
+    systemPrompt: CHART_GENERATION_SYSTEM_PROMPT,
+  });
+
+  logger.info('Agent created successfully, starting stream');
+
+  // Stream the agent response
+  const agentStream = agent.stream(
+    {
+      messages: [{ role: 'user', content: userPrompt }],
     },
-  });
+    { streamMode: "updates" },
+  );
 
   return agentStream;
 }

@@ -1,11 +1,15 @@
 import { config } from 'dotenv';
-import { resolve } from 'path';
+import { resolve, dirname } from 'path';
+import { fileURLToPath, pathToFileURL } from 'url';
+import { APIGatewayProxyWebsocketEventV2 } from 'aws-lambda';
+import { handler } from './index.js';
+import { WebSocketClient } from './utils/websocket-client.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // Load .env from project root directory
 config({ path: resolve(__dirname, '../../.env') });
-import { APIGatewayProxyWebsocketEventV2 } from 'aws-lambda';
-import { handler } from './index';
-import { WebSocketClient } from './utils/websocket-client';
 
 // Mock WebSocketClient prototype to intercept messages
 const originalSendMessage = WebSocketClient.prototype.sendMessage;
@@ -109,6 +113,6 @@ async function main() {
   }
 }
 
-if (require.main === module) {
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   main();
 }

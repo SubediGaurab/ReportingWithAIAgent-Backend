@@ -9,28 +9,6 @@ import { logger } from './utils/logger';
 import { handleError } from './utils/error-handler';
 import { streamAgentResponseToWebSocket } from './agent/streaming';
 import { WebSocketRequest } from './types/websocket';
-import * as fs from 'fs';
-
-/**
- * Validates that the Claude Agent SDK CLI is available in Lambda environment
- * @throws Error if CLI path doesn't exist in Lambda
- */
-function validateClaudeAgentSDK(): void {
-  const isLambda = process.env.AWS_EXECUTION_ENV !== undefined;
-
-  if (isLambda) {
-    const cliPath = '/opt/nodejs/node_modules/@anthropic-ai/claude-agent-sdk/cli.js';
-
-    if (!fs.existsSync(cliPath)) {
-      const errorMsg = `Claude Agent SDK CLI not found at expected Lambda layer path: ${cliPath}. ` +
-        'Ensure the Lambda layer includes @anthropic-ai/claude-agent-sdk package.';
-      logger.error('SDK validation failed', { cliPath, exists: false });
-      throw new Error(errorMsg);
-    }
-
-    logger.info('Claude Agent SDK CLI validated', { cliPath, exists: true });
-  }
-}
 
 /**
  * WebSocket connection handler
@@ -78,9 +56,6 @@ async function handleMessage(event: APIGatewayProxyWebsocketEventV2): Promise<AP
   const wsClient = new WebSocketClient(endpoint);
 
   try {
-    // Validate Claude Agent SDK is available (Lambda only)
-    validateClaudeAgentSDK();
-
     // Parse request body
     if (!event.body) {
       logger.warn('Received message with empty body', { connectionId });

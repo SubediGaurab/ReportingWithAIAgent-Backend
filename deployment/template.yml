@@ -1,11 +1,11 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: ReportingWithAIAgent Backend - Node.js Lambda function with Claude Agent SDK for chart generation
+Description: ReportingWithAIAgent Backend - Node.js Lambda function with LangChain for chart generation
 
 Parameters:
   AnthropicApiKey:
     Type: String
-    Description: Anthropic API Key for Claude Agent SDK
+    Description: Anthropic API Key for Claude/LangChain
     NoEcho: true
     Default: ''
   BedrockRegion:
@@ -67,7 +67,7 @@ Resources:
     DeletionPolicy: Delete
     Properties:
       LayerName: ReportingAgent-Dependencies-Nodejs
-      Description: Node.js dependencies for ReportingWithAIAgent Backend (Claude Agent SDK)
+      Description: Node.js dependencies for ReportingWithAIAgent Backend (LangChain + MCP Adapters)
       ContentUri: artifacts/layer.zip
       CompatibleRuntimes:
         - nodejs18.x

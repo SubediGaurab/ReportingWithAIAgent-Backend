@@ -46,9 +46,14 @@ deployment/artifacts/
 # Misc
 .DS_Store
 
-
 .bmad/
 docs/
 
+# Node.js
 node_modules/
+*.log
+output.txt
+dist/
+
+# MCP
 .mcp.js

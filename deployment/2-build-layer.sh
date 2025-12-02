@@ -38,6 +38,7 @@ echo "Layer size: $(du -h artifacts/layer.zip | cut -f1)"
 cd ../deployment
 mkdir -p artifacts/function-package
 cp ../function-nodejs/dist/index.js artifacts/function-package/
+cp ../function-nodejs/package.json artifacts/function-package/
 cp ../function-nodejs/src/agent/system-prompt.md artifacts/function-package/
 cd artifacts/function-package
 zip -r -q ../function.zip .

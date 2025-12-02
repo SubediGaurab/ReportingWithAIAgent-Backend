@@ -25,6 +25,7 @@ aws cloudformation deploy \
     --stack-name $STACK_NAME \
     --capabilities CAPABILITY_IAM \
     --parameter-overrides \
+        AnthropicApiKey="${ANTHROPIC_API_KEY}" \
         SupabaseProjectRef="${SUPABASE_PROJECT_REF}" \
         SupabaseAccessToken="${SUPABASE_ACCESS_TOKEN}" \
         BedrockRegion="${BedrockRegion}" \
