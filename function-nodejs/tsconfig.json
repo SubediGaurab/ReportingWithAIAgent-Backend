@@ -23,8 +23,7 @@
     "declarationMap": true,
     "sourceMap": true,
     "types": [
-      "node",
-      "aws-lambda"
+      "node"
     ]
   },
   "include": [
